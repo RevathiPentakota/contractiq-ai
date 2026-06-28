@@ -1,0 +1,1 @@
+"""ContractIQ AI — FastAPI Backend."""
