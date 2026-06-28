@@ -38,3 +38,9 @@ logs/
 .vscode/
 *.swp
 *.swo
+
+# Type checking
+.mypy_cache/
+
+# Ruff
+.ruff_cache/

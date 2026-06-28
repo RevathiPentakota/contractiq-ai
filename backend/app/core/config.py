@@ -56,12 +56,16 @@ class Settings(BaseSettings):
     # ==========================================================================
     # AI / LLM
     # ==========================================================================
-    google_api_key: str
+    llm_provider: str = "litellm"
 
-    llm_provider: str = "google"
-    llm_model: str = "gemini-2.5-flash"
+    llm_base_url: str
+    llm_api_key: str
 
-    embedding_model: str = "text-embedding-004"
+    llm_model: str = "gpt-4o"
+    vision_model: str = "gpt-4o"
+    embedding_model: str = "text-embedding-3-large"
+
+    llm_timeout_seconds: int = 120
 
     temperature: float = 0.2
     max_tokens: int = 4096
