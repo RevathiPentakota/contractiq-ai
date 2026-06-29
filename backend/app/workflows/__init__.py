@@ -1,13 +1,6 @@
-"""Workflows package.
-
-LangGraph ``StateGraph`` workflows live here.  Each workflow composes
-one or more agents into a directed graph of processing nodes.
-
-Planned workflows (not yet implemented):
-- ContractIngestionWorkflow  – parse, chunk, embed, and store a contract
-- ContractReviewWorkflow     – run analysis and generate a review report
-"""
+"""Workflows package – LangGraph StateGraph workflows."""
 
 from app.workflows.base import BaseWorkflow
+from app.workflows.contract_workflow import contract_graph
 
-__all__ = ["BaseWorkflow"]
+__all__ = ["BaseWorkflow", "contract_graph"]

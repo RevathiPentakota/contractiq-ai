@@ -1,14 +1,19 @@
-"""Agents package.
+"""Agents package – all LangGraph-backed contract processing agents."""
 
-This package will contain LangGraph-powered agents for ContractIQ.
-Each agent subclasses ``BaseAgent`` and encapsulates a single AI capability.
+from app.agents.base_agent import BaseAgent
+from app.agents.clause_agent import ClauseAgent
+from app.agents.document_agent import DocumentAgent
+from app.agents.persistence_agent import PersistenceAgent
+from app.agents.recommendation_agent import RecommendationAgent
+from app.agents.risk_agent import RiskAgent
+from app.agents.summary_agent import SummaryAgent
 
-Planned agents (not yet implemented):
-- ContractAnalysisAgent   – extract clauses and risk signals
-- SummaryAgent            – produce plain-language contract summaries
-- ComparisonAgent         – diff two contract versions
-"""
-
-from app.agents.base import BaseAgent
-
-__all__ = ["BaseAgent"]
+__all__ = [
+    "BaseAgent",
+    "DocumentAgent",
+    "SummaryAgent",
+    "RiskAgent",
+    "ClauseAgent",
+    "RecommendationAgent",
+    "PersistenceAgent",
+]
