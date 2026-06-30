@@ -38,15 +38,54 @@ _SUMMARY_USER_TEMPLATE = (
     "---"
 )
 
-_RISK_SYSTEM_PROMPT = (
-    "You are a senior legal contract risk analyst. "
-    "Review the contract and identify legal, financial, operational, compliance, "
-    "payment, liability, termination, intellectual property and data privacy risks. "
-    "Return ONLY valid JSON. Do not return markdown. Do not explain your reasoning. "
-    "If there are no risks return an empty JSON array. "
-    "Each risk must include: category, severity, title, description, clause_reference, recommendation."
-)
+_RISK_SYSTEM_PROMPT = """
+You are a senior legal contract risk analyst.
 
+Review the contract and identify ALL legal, financial, commercial,
+operational, compliance, payment, liability, termination,
+intellectual property, confidentiality and data privacy risks.
+
+A risk includes (but is not limited to):
+- Unlimited liability
+- Missing limitation of liability
+- Weak confidentiality
+- Short termination notice
+- Missing SLA penalties
+- Ambiguous payment terms
+- Automatic renewal
+- Broad IP assignment
+- Regulatory compliance issues
+- Weak data protection
+- One-sided obligations
+- Indemnification issues
+
+Return ONLY valid JSON.
+Do not return markdown.
+Do not explain your reasoning.
+
+If there are no risks, return an empty JSON array.
+
+Each risk must include:
+- category
+- severity
+- title
+- description
+- clause_reference
+- recommendation
+
+Example:
+
+[
+  {
+    "category": "Legal",
+    "severity": "High",
+    "title": "Unlimited Liability",
+    "description": "The agreement contains an unlimited liability clause.",
+    "clause_reference": "Section 7",
+    "recommendation": "Limit liability to fees paid under the agreement."
+  }
+]
+"""
 _RISK_USER_TEMPLATE = (
     "Please analyse the following contract for risks and return the results as JSON:\n\n"
     "---\n"
@@ -67,23 +106,6 @@ _CLAUSE_USER_TEMPLATE = (
     "---\n"
     "{contract_text}\n"
     "---"
-)
-
-_RECOMMENDATION_SYSTEM_PROMPT = (
-    "You are a senior legal advisor. "
-    "Review the executive summary, identified risks, and extracted clauses. "
-    "Generate actionable business recommendations. "
-    "Return ONLY valid JSON. Do not return markdown. Do not explain your reasoning. "
-    "If there are no recommendations return an empty JSON array. "
-    "Each recommendation must include: priority, category, recommendation, rationale."
-)
-
-_RECOMMENDATION_USER_TEMPLATE = (
-    "Please review the following contract analysis and generate actionable recommendations:\n\n"
-    "Executive Summary:\n{summary}\n\n"
-    "Identified Risks:\n{risks_json}\n\n"
-    "Extracted Clauses:\n{clauses_json}\n\n"
-    "Return the recommendations as JSON."
 )
 
 
@@ -293,6 +315,9 @@ class LLMService:
 
         # Parse the JSON response; LLM should return an array of risks.
         try:
+            raw_response = raw_response.replace("```json", "")
+            raw_response = raw_response.replace("```", "")
+            raw_response = raw_response.strip()
             risks = json.loads(raw_response)
         except json.JSONDecodeError as err:
             logger.error(
@@ -318,6 +343,113 @@ class LLMService:
         )
 
         return risks
+
+    def generate_recommendations(
+            self,
+            summary: str,
+            risks: list[dict],
+            clauses: list[dict],
+        ) -> list[dict[str, Any]]:
+            """Generate contract improvement recommendations."""
+
+            settings = get_settings()
+
+            logger.info(
+                "[LLMService] Requesting recommendations | model={model}",
+                model=settings.llm_model,
+            )
+
+            prompt = f"""
+        Executive Summary:
+        {summary}
+
+        Risks:
+        {json.dumps(risks, indent=2)}
+
+        Clauses:
+        {json.dumps(clauses, indent=2)}
+
+        Based on the above contract analysis, generate actionable recommendations.
+
+        Return ONLY valid JSON.
+
+        Each recommendation must contain:
+
+        - priority
+        - title
+        - description
+        - reason
+
+        Example:
+
+        [
+        {{
+            "priority":"High",
+            "title":"Limit Liability",
+            "description":"Limit liability to fees paid under the agreement.",
+            "reason":"Unlimited liability exposes the supplier to excessive financial risk."
+        }}
+        ]
+        """
+
+            payload = {
+                "model": settings.llm_model,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "You are an expert legal contract advisor.",
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt,
+                    },
+                ],
+                "temperature": settings.temperature,
+                "max_tokens": settings.max_tokens,
+            }
+
+            try:
+                with httpx.Client(timeout=settings.llm_timeout_seconds) as client:
+                    response = client.post(
+                        url=f"{settings.llm_base_url.rstrip('/')}/chat/completions",
+                        headers={
+                            "Authorization": f"Bearer {settings.llm_api_key}",
+                            "Content-Type": "application/json",
+                        },
+                        json=payload,
+                    )
+
+                    response.raise_for_status()
+
+            except Exception:
+                raise
+
+            data = response.json()
+
+            try:
+                raw_response = data["choices"][0]["message"]["content"].strip()
+            except (KeyError, IndexError) as err:
+                raise ValueError(
+                    f"Unexpected LLM response structure: {data}"
+                ) from err
+
+            raw_response = raw_response.replace("```json", "")
+            raw_response = raw_response.replace("```", "")
+            raw_response = raw_response.strip()
+
+            try:
+                recommendations = json.loads(raw_response)
+            except json.JSONDecodeError as err:
+                raise ValueError(
+                    f"LLM did not return valid JSON: {raw_response[:200]}"
+                ) from err
+
+            logger.info(
+                "[LLMService] Recommendation generation complete | {count} recommendations",
+                count=len(recommendations),
+            )
+
+            return recommendations
 
     def generate_clauses(self, contract_text: str) -> list[dict[str, Any]]:
         """Extract important clauses from a contract.
@@ -409,6 +541,24 @@ class LLMService:
         # Extract content from the standard OpenAI-compatible response shape.
         try:
             raw_response = data["choices"][0]["message"]["content"].strip()
+
+            logger.debug(
+                "[LLMService] Raw Clause Response:\n{}",
+                raw_response,
+            )
+
+            # Remove markdown code fences if present
+            raw_response = (
+                raw_response
+                    .replace("```json", "")
+                    .replace("```", "")
+                    .strip()
+            )
+
+            logger.debug(
+                "[LLMService] Cleaned Clause Response:\n{}",
+                raw_response,
+            )   
         except (KeyError, IndexError) as err:
             raise ValueError(
                 f"Unexpected LLM response structure: {data}"
@@ -441,143 +591,3 @@ class LLMService:
         )
 
         return clauses
-
-    def generate_recommendations(
-        self,
-        summary: str,
-        risks: list[dict[str, Any]],
-        clauses: list[dict[str, Any]],
-    ) -> list[dict[str, Any]]:
-        """Generate actionable business recommendations from contract analysis.
-
-        Sends the contract summary, identified risks, and extracted clauses to
-        the LiteLLM Proxy using a senior legal advisor system prompt.
-        Expects a JSON array of recommendations in return.
-
-        Args:
-            summary: Executive summary of the contract (string).
-                     Should be non-empty; empty text raises ``ValueError``.
-            risks: List of risk dictionaries identified in the contract.
-                   May be empty if no risks were found.
-            clauses: List of clause dictionaries extracted from the contract.
-                     May be empty if no clauses were found.
-
-        Returns:
-            List of recommendation dictionaries, each containing:
-            - priority: str ("High", "Medium", "Low")
-            - category: str (e.g. "Financial", "Legal", "Operational")
-            - recommendation: str (actionable recommendation)
-            - rationale: str (explanation or justification)
-
-            Returns an empty list if the LLM identifies no recommendations.
-
-        Raises:
-            ValueError: If ``summary`` is empty or LLM response is not valid JSON.
-            httpx.HTTPStatusError: On HTTP 4xx/5xx from the proxy.
-            httpx.TimeoutException: If the proxy exceeds the timeout.
-            Exception: On any other unexpected error.
-        """
-        if not summary or not summary.strip():
-            raise ValueError("summary must not be empty.")
-
-        settings = get_settings()
-
-        # Convert risks and clauses to JSON strings for inclusion in prompt
-        risks_json = json.dumps(risks) if risks else "[]"
-        clauses_json = json.dumps(clauses) if clauses else "[]"
-
-        logger.info(
-            "[LLMService] Requesting recommendations | model={model} | "
-            "summary_length={length} chars | risks={risk_count} | clauses={clause_count}",
-            model=settings.llm_model,
-            length=len(summary),
-            risk_count=len(risks),
-            clause_count=len(clauses),
-        )
-
-        payload = {
-            "model": settings.llm_model,
-            "messages": [
-                {"role": "system", "content": _RECOMMENDATION_SYSTEM_PROMPT},
-                {
-                    "role": "user",
-                    "content": _RECOMMENDATION_USER_TEMPLATE.format(
-                        summary=summary,
-                        risks_json=risks_json,
-                        clauses_json=clauses_json,
-                    ),
-                },
-            ],
-            "temperature": settings.temperature,
-            "max_tokens": settings.max_tokens,
-        }
-
-        try:
-            with httpx.Client(timeout=settings.llm_timeout_seconds) as client:
-                response = client.post(
-                    url=f"{settings.llm_base_url.rstrip('/')}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {settings.llm_api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json=payload,
-                )
-                response.raise_for_status()
-
-        except httpx.HTTPStatusError as err:
-            logger.error(
-                "[LLMService] HTTP error {status}: {body}",
-                status=err.response.status_code,
-                body=err.response.text,
-            )
-            raise
-        except httpx.TimeoutException:
-            logger.error(
-                "[LLMService] Request timed out after {timeout}s",
-                timeout=settings.llm_timeout_seconds,
-            )
-            raise
-        except httpx.RequestError as err:
-            logger.error(
-                "[LLMService] Network error: {error}",
-                error=str(err),
-            )
-            raise
-
-        data = response.json()
-
-        # Extract content from the standard OpenAI-compatible response shape.
-        try:
-            raw_response = data["choices"][0]["message"]["content"].strip()
-        except (KeyError, IndexError) as err:
-            raise ValueError(
-                f"Unexpected LLM response structure: {data}"
-            ) from err
-
-        # Parse the JSON response; LLM should return an array of recommendations.
-        try:
-            recommendations = json.loads(raw_response)
-        except json.JSONDecodeError as err:
-            logger.error(
-                "[LLMService] Failed to parse LLM JSON response: {error}",
-                error=str(err),
-            )
-            raise ValueError(
-                f"LLM did not return valid JSON: {raw_response[:200]}"
-            ) from err
-
-        if not isinstance(recommendations, list):
-            logger.error(
-                "[LLMService] LLM returned non-list JSON: {type}",
-                type=type(recommendations).__name__,
-            )
-            raise ValueError(
-                f"Expected JSON array of recommendations, got {type(recommendations).__name__}"
-            )
-
-        logger.info(
-            "[LLMService] Recommendation generation complete | {count} recommendations generated",
-            count=len(recommendations),
-        )
-
-        return recommendations

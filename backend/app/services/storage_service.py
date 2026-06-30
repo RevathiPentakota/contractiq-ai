@@ -35,14 +35,15 @@ class StorageService:
         """Lazy-load and cache the Supabase client."""
         if self._client is None:
             settings = get_settings()
-            if not settings.supabase_url or not settings.supabase_anon_key:
+            if not settings.supabase_url or not settings.supabase_service_role_key:
                 raise ValueError(
                     "Supabase credentials not configured. "
-                    "Set SUPABASE_URL and SUPABASE_ANON_KEY."
+                    "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY."
                 )
+
             self._client = create_client(
                 settings.supabase_url,
-                settings.supabase_anon_key,
+                settings.supabase_service_role_key,
             )
         return self._client
 
@@ -78,6 +79,49 @@ class StorageService:
         except Exception as err:
             logger.error(
                 "[StorageService] Failed to download {path}: {error}",
+                path=storage_path,
+                error=str(err),
+            )
+            raise
+
+    def upload_file(self, file_data: bytes, storage_path: str) -> str:
+        """Upload a file to Supabase Storage.
+
+        Args:
+            file_data: Raw file bytes to upload.
+            storage_path: Relative path within the bucket
+                         (e.g. "2024/contract_123.pdf").
+
+        Returns:
+            The storage path of the uploaded file.
+
+        Raises:
+            Exception: On network or API errors.
+
+        Example:
+            >>> service = StorageService("contracts")
+            >>> path = service.upload_file(pdf_bytes, "2024/sample.pdf")
+            >>> print(path)  # "2024/sample.pdf"
+        """
+        logger.debug(
+            "[StorageService] Uploading file: {path}",
+            path=storage_path,
+        )
+
+        try:
+            self.client.storage.from_(self.bucket_name).upload(
+                storage_path,
+                file_data,
+                file_options={"content-type": "application/pdf"},
+            )
+            logger.info(
+                "[StorageService] File uploaded successfully: {path}",
+                path=storage_path,
+            )
+            return storage_path
+        except Exception as err:
+            logger.error(
+                "[StorageService] Failed to upload {path}: {error}",
                 path=storage_path,
                 error=str(err),
             )

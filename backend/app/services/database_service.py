@@ -10,12 +10,14 @@ provides high-level methods for saving analysis results.
 
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
 from loguru import logger
 
 from app.core.config import get_settings
 from app.state.contract_state import ContractState
+from supabase import Client, create_client
 
 
 class DatabaseService:
@@ -45,6 +47,10 @@ class DatabaseService:
         allowing environment changes to be respected.
         """
         self.settings = get_settings()
+        self._client: Client = create_client(
+            self.settings.supabase_url,
+            self.settings.supabase_service_role_key,
+        )
 
     def save_contract_analysis(
         self,
@@ -97,6 +103,7 @@ class DatabaseService:
                 file_name=file_name,
                 storage_path=storage_path,
                 metadata=metadata,
+                processing_status=state.get("processing_status", "pending"),
             )
 
             self._save_summary(
@@ -133,40 +140,37 @@ class DatabaseService:
             raise
 
     def _save_contract_metadata(
-        self,
-        contract_id: str,
-        file_name: str,
-        storage_path: str,
-        metadata: dict[str, Any],
-    ) -> None:
-        """Save contract metadata to database.
+            self,
+            contract_id: str,
+            file_name: str,
+            storage_path: str,
+            metadata: dict[str, Any],
+            processing_status: str,
+        ) -> None:
+        """Save contract metadata."""
 
-        Args:
-            contract_id: Unique contract identifier.
-            file_name: Original uploaded file name.
-            storage_path: Path in Supabase Storage.
-            metadata: Additional metadata (file size, word count, etc.).
-
-        Implementation Notes:
-            Placeholder method. Will save to contracts table when schema
-            is implemented.
-        """
         logger.debug(
             "[DatabaseService] Saving contract metadata | contract_id={contract_id}",
             contract_id=contract_id,
         )
 
-        # TODO: Implement contract metadata persistence to contracts table.
-        # Expected schema:
-        #   - contract_id (pk)
-        #   - file_name
-        #   - storage_path
-        #   - file_size
-        #   - word_count
-        #   - page_count
-        #   - created_at
-        #   - updated_at
-        pass
+        record = {
+            "contractid": contract_id,
+            "filename": file_name,
+            "storagepath": storage_path,
+            "filesize": metadata.get("file_size"),
+            "pagecount": metadata.get("page_count"),
+            "wordcount": metadata.get("word_count"),
+            "fileformat": metadata.get("format"),
+            "processingstatus": processing_status,
+        }
+
+        self._client.table("contracts").insert(record).execute()
+
+        logger.info(
+            "[DatabaseService] Contract metadata saved | contract_id={contract_id}",
+            contract_id=contract_id,
+        )
 
     def _save_summary(
         self,
@@ -178,23 +182,24 @@ class DatabaseService:
         Args:
             contract_id: Unique contract identifier.
             summary: Executive summary text.
-
-        Implementation Notes:
-            Placeholder method. Will save to contract_summaries table.
         """
         logger.debug(
             "[DatabaseService] Saving contract summary | contract_id={contract_id}",
             contract_id=contract_id,
         )
 
-        # TODO: Implement summary persistence to contract_summaries table.
-        # Expected schema:
-        #   - id (pk)
-        #   - contract_id (fk)
-        #   - summary_text
-        #   - word_count
-        #   - created_at
-        pass
+        record = {
+            "summaryid": str(uuid.uuid4()),
+            "contractid": contract_id,
+            "summary": summary,
+        }
+
+        self._client.table("contractsummaries").insert(record).execute()
+
+        logger.info(
+            "[DatabaseService] Contract summary saved | contract_id={contract_id}",
+            contract_id=contract_id,
+        )
 
     def _save_risks(
         self,
@@ -206,9 +211,6 @@ class DatabaseService:
         Args:
             contract_id: Unique contract identifier.
             risks: List of risk dictionaries with category, severity, etc.
-
-        Implementation Notes:
-            Placeholder method. Will save to contract_risks table.
         """
         logger.debug(
             "[DatabaseService] Saving contract risks | contract_id={contract_id} | "
@@ -217,18 +219,26 @@ class DatabaseService:
             count=len(risks),
         )
 
-        # TODO: Implement risks persistence to contract_risks table.
-        # Expected schema:
-        #   - id (pk)
-        #   - contract_id (fk)
-        #   - category
-        #   - severity
-        #   - title
-        #   - description
-        #   - clause_reference
-        #   - recommendation
-        #   - created_at
-        pass
+        for risk in risks:
+            record = {
+                "riskid": str(uuid.uuid4()),
+                "contractid": contract_id,
+                "category": risk.get("category"),
+                "severity": risk.get("severity"),
+                "title": risk.get("title"),
+                "description": risk.get("description"),
+                "clausereference": risk.get("clause_reference"),
+                "recommendation": risk.get("recommendation"),
+            }
+
+            self._client.table("contractrisks").insert(record).execute()
+
+        logger.info(
+            "[DatabaseService] Contract risks saved | contract_id={contract_id} | "
+            "risk_count={count}",
+            contract_id=contract_id,
+            count=len(risks),
+        )
 
     def _save_clauses(
         self,
@@ -240,9 +250,6 @@ class DatabaseService:
         Args:
             contract_id: Unique contract identifier.
             clauses: List of clause dictionaries with title, category, etc.
-
-        Implementation Notes:
-            Placeholder method. Will save to contract_clauses table.
         """
         logger.debug(
             "[DatabaseService] Saving contract clauses | contract_id={contract_id} | "
@@ -251,17 +258,25 @@ class DatabaseService:
             count=len(clauses),
         )
 
-        # TODO: Implement clauses persistence to contract_clauses table.
-        # Expected schema:
-        #   - id (pk)
-        #   - contract_id (fk)
-        #   - title
-        #   - category
-        #   - clause_reference
-        #   - description
-        #   - importance
-        #   - created_at
-        pass
+        for clause in clauses:
+            record = {
+                "clauseid": str(uuid.uuid4()),
+                "contractid": contract_id,
+                "title": clause.get("title"),
+                "category": clause.get("category"),
+                "clausereference": clause.get("clause_reference"),
+                "description": clause.get("description"),
+                "importance": clause.get("importance"),
+            }
+
+            self._client.table("contractclauses").insert(record).execute()
+
+        logger.info(
+            "[DatabaseService] Contract clauses saved | contract_id={contract_id} | "
+            "clause_count={count}",
+            contract_id=contract_id,
+            count=len(clauses),
+        )
 
     def _save_recommendations(
         self,
@@ -273,9 +288,6 @@ class DatabaseService:
         Args:
             contract_id: Unique contract identifier.
             recommendations: List of recommendation dictionaries.
-
-        Implementation Notes:
-            Placeholder method. Will save to contract_recommendations table.
         """
         logger.debug(
             "[DatabaseService] Saving recommendations | contract_id={contract_id} | "
@@ -284,13 +296,230 @@ class DatabaseService:
             count=len(recommendations),
         )
 
-        # TODO: Implement recommendations persistence to contract_recommendations table.
-        # Expected schema:
-        #   - id (pk)
-        #   - contract_id (fk)
-        #   - priority
-        #   - category
-        #   - recommendation
-        #   - rationale
-        #   - created_at
-        pass
+        for rec in recommendations:
+            record = {
+                "recommendationid": str(uuid.uuid4()),
+                "contractid": contract_id,
+                "priority": rec.get("priority"),
+                "title": rec.get("title"),
+                "description": rec.get("description"),
+                "reason": rec.get("reason"),
+            }
+
+            self._client.table("contractrecommendations").insert(record).execute()
+
+        logger.info(
+            "[DatabaseService] Recommendations saved | contract_id={contract_id} | "
+            "recommendation_count={count}",
+            contract_id=contract_id,
+            count=len(recommendations),
+        )
+
+    def get_contracts(self) -> list[dict[str, Any]]:
+        """Retrieve all contracts ordered by creation date (newest first).
+
+        Returns:
+            List of contract dictionaries containing:
+            - contract_id
+            - file_name
+            - processing_status
+            - created_at
+            - file_size
+            - page_count
+
+        Example:
+            >>> service = DatabaseService()
+            >>> contracts = service.get_contracts()
+            >>> for contract in contracts:
+            ...     print(contract["file_name"])
+        """
+        logger.debug("[DatabaseService] Retrieving all contracts")
+
+        try:
+            response = (
+                self._client.table("contracts")
+                .select(
+                    "contractid, filename, processingstatus, createdat, filesize, pagecount"
+                )
+                .order("createdat", desc=True)
+                .execute()
+            )
+
+            contracts = [
+                {
+                    "contract_id": record["contractid"],
+                    "file_name": record["filename"],
+                    "processing_status": record["processingstatus"],
+                    "created_at": record["createdat"],
+                    "file_size": record["filesize"],
+                    "page_count": record["pagecount"],
+                }
+                for record in response.data
+            ]
+
+            logger.info(
+                "[DatabaseService] Retrieved {count} contracts",
+                count=len(contracts),
+            )
+
+            return contracts
+
+        except Exception as err:
+            logger.error(
+                "[DatabaseService] Failed to retrieve contracts: {error}",
+                error=str(err),
+            )
+            raise
+
+    def get_contract(self, contract_id: str) -> dict[str, Any]:
+        """Retrieve complete contract analysis by ID.
+
+        Joins data from contracts, contractsummaries, contractrisks,
+        contractclauses, and contractrecommendations tables.
+
+        Args:
+            contract_id: UUID of the contract.
+
+        Returns:
+            Dictionary containing:
+            - contract_id
+            - file_name
+            - summary
+            - risks
+            - clauses
+            - recommendations
+            - processing_status
+            - metadata (file_size, page_count, word_count, format)
+
+        Raises:
+            ValueError: If contract not found.
+            Exception: On database errors.
+
+        Example:
+            >>> service = DatabaseService()
+            >>> contract = service.get_contract("550e8400-e29b-41d4-a716-446655440000")
+            >>> print(contract["summary"])
+        """
+        logger.debug(
+            "[DatabaseService] Retrieving contract | contract_id={contract_id}",
+            contract_id=contract_id,
+        )
+
+        try:
+            # Get contract metadata
+            contract_response = (
+                self._client.table("contracts")
+                .select("*")
+                .eq("contractid", contract_id)
+                .execute()
+            )
+
+            if not contract_response.data:
+                logger.warning(
+                    "[DatabaseService] Contract not found | contract_id={contract_id}",
+                    contract_id=contract_id,
+                )
+                raise ValueError(f"Contract not found: {contract_id}")
+
+            contract = contract_response.data[0]
+
+            # Get summary
+            summary_response = (
+                self._client.table("contractsummaries")
+                .select("summary")
+                .eq("contractid", contract_id)
+                .execute()
+            )
+            summary = summary_response.data[0]["summary"] if summary_response.data else ""
+
+            # Get risks
+            risks_response = (
+                self._client.table("contractrisks")
+                .select("*")
+                .eq("contractid", contract_id)
+                .execute()
+            )
+            risks = [
+                {
+                    "category": r["category"],
+                    "severity": r["severity"],
+                    "title": r["title"],
+                    "description": r["description"],
+                    "clause_reference": r["clausereference"],
+                    "recommendation": r["recommendation"],
+                }
+                for r in risks_response.data
+            ]
+
+            # Get clauses
+            clauses_response = (
+                self._client.table("contractclauses")
+                .select("*")
+                .eq("contractid", contract_id)
+                .execute()
+            )
+            clauses = [
+                {
+                    "title": c["title"],
+                    "category": c["category"],
+                    "clause_reference": c["clausereference"],
+                    "description": c["description"],
+                    "importance": c["importance"],
+                }
+                for c in clauses_response.data
+            ]
+
+            # Get recommendations
+            recs_response = (
+                self._client.table("contractrecommendations")
+                .select("*")
+                .eq("contractid", contract_id)
+                .execute()
+            )
+            recommendations = [
+                {
+                    "priority": r["priority"],
+                    "title": r["title"],
+                    "description": r["description"],
+                    "reason": r["reason"],
+                }
+                for r in recs_response.data
+            ]
+
+            logger.info(
+                "[DatabaseService] Contract retrieved | contract_id={contract_id} | "
+                "summary_length={summary_len} | risks={risk_count} | clauses={clause_count} | "
+                "recommendations={rec_count}",
+                contract_id=contract_id,
+                summary_len=len(summary),
+                risk_count=len(risks),
+                clause_count=len(clauses),
+                rec_count=len(recommendations),
+            )
+
+            return {
+                "contract_id": contract["contractid"],
+                "file_name": contract["filename"],
+                "created_at": contract.get("createdat"),
+                "summary": summary,
+                "risks": risks,
+                "clauses": clauses,
+                "recommendations": recommendations,
+                "processing_status": contract["processingstatus"],
+                "metadata": {
+                    "file_size": contract["filesize"],
+                    "page_count": contract["pagecount"],
+                    "word_count": contract.get("wordcount"),
+                    "format": contract.get("fileformat"),
+                },
+            }
+
+        except ValueError:
+            raise
+        except Exception as err:
+            logger.error(
+                "[DatabaseService] Failed to retrieve contract {contract_id}: {error}",
+                contract_id=contract_id,
+                error=str(err),
+            )
+            raise
