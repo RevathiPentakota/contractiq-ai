@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="920" viewBox="0 0 1400 920" role="img" aria-labelledby="title desc">
+  <title id="title">ContractIQ AI High-Level Architecture Flowchart</title>
+  <desc id="desc">A high-level flowchart showing the ContractIQ AI frontend, FastAPI backend, LangGraph agent workflow, Supabase storage and database, and LLM service.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#334155"/>
+    </marker>
+    <style>
+      .bg { fill: #f8fafc; }
+      .title { font: 700 34px Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 400 16px Arial, sans-serif; fill: #475569; }
+      .lane-title { font: 700 18px Arial, sans-serif; fill: #1e293b; }
+      .box { fill: #ffffff; stroke: #cbd5e1; stroke-width: 2; rx: 14; }
+      .box-blue { fill: #eff6ff; stroke: #60a5fa; stroke-width: 2; rx: 14; }
+      .box-green { fill: #f0fdf4; stroke: #4ade80; stroke-width: 2; rx: 14; }
+      .box-amber { fill: #fffbeb; stroke: #f59e0b; stroke-width: 2; rx: 14; }
+      .box-purple { fill: #faf5ff; stroke: #c084fc; stroke-width: 2; rx: 14; }
+      .box-red { fill: #fff1f2; stroke: #fb7185; stroke-width: 2; rx: 14; }
+      .box-title { font: 700 17px Arial, sans-serif; fill: #0f172a; }
+      .box-text { font: 400 13px Arial, sans-serif; fill: #475569; }
+      .small { font: 400 12px Arial, sans-serif; fill: #64748b; }
+      .arrow { fill: none; stroke: #334155; stroke-width: 2.4; marker-end: url(#arrow); }
+      .dashed { fill: none; stroke: #64748b; stroke-width: 2; stroke-dasharray: 8 6; marker-end: url(#arrow); }
+      .lane { fill: #ffffff; stroke: #e2e8f0; stroke-width: 2; rx: 20; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1400" height="920"/>
+
+  <text class="title" x="700" y="54" text-anchor="middle">ContractIQ AI Architecture</text>
+  <text class="subtitle" x="700" y="82" text-anchor="middle">High-level flow from browser upload to AI analysis, storage, and history/detail retrieval</text>
+
+  <rect class="lane" x="50" y="125" width="300" height="650"/>
+  <text class="lane-title" x="200" y="160" text-anchor="middle">Frontend</text>
+
+  <rect class="lane" x="390" y="125" width="300" height="650"/>
+  <text class="lane-title" x="540" y="160" text-anchor="middle">Backend API</text>
+
+  <rect class="lane" x="730" y="125" width="300" height="650"/>
+  <text class="lane-title" x="880" y="160" text-anchor="middle">LangGraph Workflow</text>
+
+  <rect class="lane" x="1070" y="125" width="280" height="650"/>
+  <text class="lane-title" x="1210" y="160" text-anchor="middle">External Services</text>
+
+  <rect class="box-blue" x="90" y="205" width="220" height="90"/>
+  <text class="box-title" x="200" y="235" text-anchor="middle">User Browser</text>
+  <text class="box-text" x="200" y="260" text-anchor="middle">Upload PDF</text>
+  <text class="box-text" x="200" y="280" text-anchor="middle">View analysis results</text>
+
+  <rect class="box-blue" x="90" y="350" width="220" height="120"/>
+  <text class="box-title" x="200" y="382" text-anchor="middle">Next.js Dashboard</text>
+  <text class="box-text" x="200" y="407" text-anchor="middle">UploadSection</text>
+  <text class="box-text" x="200" y="427" text-anchor="middle">Summary, Risks, Clauses</text>
+  <text class="box-text" x="200" y="447" text-anchor="middle">Recommendations, History</text>
+
+  <rect class="box-green" x="430" y="205" width="220" height="110"/>
+  <text class="box-title" x="540" y="236" text-anchor="middle">FastAPI App</text>
+  <text class="box-text" x="540" y="261" text-anchor="middle">CORS + logging middleware</text>
+  <text class="box-text" x="540" y="281" text-anchor="middle">API v1 router</text>
+
+  <rect class="box-green" x="430" y="360" width="220" height="135"/>
+  <text class="box-title" x="540" y="392" text-anchor="middle">Contracts API</text>
+  <text class="box-text" x="540" y="417" text-anchor="middle">POST /contracts/upload</text>
+  <text class="box-text" x="540" y="437" text-anchor="middle">GET /contracts</text>
+  <text class="box-text" x="540" y="457" text-anchor="middle">GET /contracts/{id}</text>
+  <text class="box-text" x="540" y="477" text-anchor="middle">Validation + response models</text>
+
+  <rect class="box-amber" x="430" y="555" width="220" height="115"/>
+  <text class="box-title" x="540" y="588" text-anchor="middle">Service Layer</text>
+  <text class="box-text" x="540" y="613" text-anchor="middle">StorageService</text>
+  <text class="box-text" x="540" y="633" text-anchor="middle">DatabaseService</text>
+  <text class="box-text" x="540" y="653" text-anchor="middle">LLMService</text>
+
+  <rect class="box-purple" x="770" y="180" width="220" height="70"/>
+  <text class="box-title" x="880" y="211" text-anchor="middle">ContractState</text>
+  <text class="box-text" x="880" y="232" text-anchor="middle">Shared workflow state</text>
+
+  <rect class="box-purple" x="770" y="285" width="220" height="62"/>
+  <text class="box-title" x="880" y="312" text-anchor="middle">DocumentAgent</text>
+  <text class="box-text" x="880" y="332" text-anchor="middle">Extract text + metadata</text>
+
+  <rect class="box-purple" x="770" y="375" width="220" height="62"/>
+  <text class="box-title" x="880" y="402" text-anchor="middle">SummaryAgent</text>
+  <text class="box-text" x="880" y="422" text-anchor="middle">Executive summary</text>
+
+  <rect class="box-purple" x="770" y="465" width="220" height="62"/>
+  <text class="box-title" x="880" y="492" text-anchor="middle">RiskAgent</text>
+  <text class="box-text" x="880" y="512" text-anchor="middle">Identify risks</text>
+
+  <rect class="box-purple" x="770" y="555" width="220" height="62"/>
+  <text class="box-title" x="880" y="582" text-anchor="middle">ClauseAgent</text>
+  <text class="box-text" x="880" y="602" text-anchor="middle">Extract key clauses</text>
+
+  <rect class="box-purple" x="770" y="645" width="220" height="62"/>
+  <text class="box-title" x="880" y="672" text-anchor="middle">RecommendationAgent</text>
+  <text class="box-text" x="880" y="692" text-anchor="middle">Actionable suggestions</text>
+
+  <rect class="box-purple" x="770" y="735" width="220" height="62"/>
+  <text class="box-title" x="880" y="762" text-anchor="middle">PersistenceAgent</text>
+  <text class="box-text" x="880" y="782" text-anchor="middle">Save final analysis</text>
+
+  <rect class="box-red" x="1100" y="225" width="220" height="105"/>
+  <text class="box-title" x="1210" y="257" text-anchor="middle">Supabase Storage</text>
+  <text class="box-text" x="1210" y="282" text-anchor="middle">Original uploaded PDFs</text>
+  <text class="box-text" x="1210" y="302" text-anchor="middle">Workflow downloads files</text>
+
+  <rect class="box-red" x="1100" y="395" width="220" height="120"/>
+  <text class="box-title" x="1210" y="427" text-anchor="middle">LLM API</text>
+  <text class="box-text" x="1210" y="452" text-anchor="middle">LiteLLM-compatible</text>
+  <text class="box-text" x="1210" y="472" text-anchor="middle">Gemini / OpenAI-style</text>
+  <text class="box-text" x="1210" y="492" text-anchor="middle">JSON analysis output</text>
+
+  <rect class="box-red" x="1100" y="590" width="220" height="135"/>
+  <text class="box-title" x="1210" y="622" text-anchor="middle">Supabase Postgres</text>
+  <text class="box-text" x="1210" y="647" text-anchor="middle">contracts</text>
+  <text class="box-text" x="1210" y="667" text-anchor="middle">summaries, risks</text>
+  <text class="box-text" x="1210" y="687" text-anchor="middle">clauses, recommendations</text>
+
+  <path class="arrow" d="M200 295 L200 340"/>
+  <path class="arrow" d="M310 410 L420 410"/>
+  <path class="arrow" d="M540 315 L540 350"/>
+  <path class="arrow" d="M650 428 L760 215"/>
+  <path class="arrow" d="M880 250 L880 275"/>
+  <path class="arrow" d="M880 347 L880 365"/>
+  <path class="arrow" d="M880 437 L880 455"/>
+  <path class="arrow" d="M880 527 L880 545"/>
+  <path class="arrow" d="M880 617 L880 635"/>
+  <path class="arrow" d="M880 707 L880 725"/>
+  <path class="arrow" d="M760 766 L650 613"/>
+  <path class="arrow" d="M430 612 L315 455"/>
+
+  <path class="arrow" d="M650 612 C780 610 920 610 1090 657"/>
+  <path class="arrow" d="M650 580 C790 520 930 325 1090 282"/>
+  <path class="dashed" d="M990 406 C1030 405 1060 405 1090 432"/>
+  <path class="dashed" d="M990 496 C1030 496 1060 470 1090 455"/>
+  <path class="dashed" d="M990 586 C1035 582 1065 515 1090 482"/>
+  <path class="dashed" d="M990 676 C1035 656 1065 540 1090 495"/>
+
+  <path class="arrow" d="M1100 665 C920 830 520 825 310 430"/>
+  <text class="small" x="710" y="846" text-anchor="middle">History/detail reads return saved analysis to the frontend</text>
+
+  <rect class="box" x="145" y="820" width="1110" height="56"/>
+  <text class="box-title" x="700" y="844" text-anchor="middle">Primary Runtime Flow</text>
+  <text class="box-text" x="700" y="864" text-anchor="middle">Browser uploads PDF → FastAPI validates and stores file → LangGraph agents call services/LLM → Persistence saves results → UI renders analysis and history</text>
+</svg>

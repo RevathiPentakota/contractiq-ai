@@ -3,11 +3,27 @@
 Every node in the contract processing graph reads from and writes to
 this TypedDict.  LangGraph merges node outputs back into the graph state
 automatically, so each agent only needs to return the keys it modifies.
+
+Reducer annotations
+-------------------
+Fields written by multiple parallel branches require explicit reducer
+functions so LangGraph can safely merge concurrent updates:
+
+* ``errors``            – ``operator.add`` concatenates error lists from all
+                          branches into a single accumulated list.
+* ``processing_status`` – ``_keep_latest`` keeps the most recently written
+                          value (last writer wins across parallel branches).
 """
 
 from __future__ import annotations
 
-from typing import Any, TypedDict
+import operator
+from typing import Annotated, Any, TypedDict
+
+
+def _keep_latest(a: str, b: str) -> str:  # noqa: D401
+    """Reducer for processing_status: last writer wins in parallel branches."""
+    return b
 
 
 class ContractState(TypedDict, total=False):
@@ -32,7 +48,10 @@ class ContractState(TypedDict, total=False):
         recommendations:    Actionable recommendations from RecommendationAgent.
         processing_status:  Lifecycle status: ``"pending"`` → ``"processing"``
                             → ``"completed"`` | ``"failed"``.
+                            Uses ``_keep_latest`` reducer for parallel safety.
         errors:             Accumulated non-fatal error messages from any node.
+                            Uses ``operator.add`` reducer so parallel branches
+                            each append their errors without overwriting others.
         created_at:         ISO-8601 timestamp when the session was created.
     """
 
@@ -46,6 +65,6 @@ class ContractState(TypedDict, total=False):
     clauses: list[dict[str, Any]]
     metadata: dict[str, Any]
     recommendations: list[str]
-    processing_status: str
-    errors: list[str]
+    processing_status: Annotated[str, _keep_latest]
+    errors: Annotated[list[str], operator.add]
     created_at: str

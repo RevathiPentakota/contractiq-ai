@@ -1,19 +1,17 @@
-"""ContractWorkflow – LangGraph StateGraph for contract processing.
-
-This module assembles the end-to-end contract analysis pipeline as a
-directed LangGraph ``StateGraph``.  The graph defines execution order
-only; all business logic lives inside the individual agent nodes.
+"""ContractWorkflow - LangGraph StateGraph for contract processing.
 
 Execution order
 ---------------
 START
-  └─► document_agent        (extract text from raw file)
-        └─► summary_agent   (generate plain-language summary)
-              └─► risk_agent         (identify risk signals)
-                    └─► clause_agent (extract and label clauses)
-                          └─► recommendation_agent (produce recommendations)
-                                └─► persistence_agent (save results)
-                                      └─► END
+  -> document_agent
+        +-> summary_agent  -+
+        +-> risk_agent     -+-> recommendation_agent -> persistence_agent -> END
+        +-> clause_agent   -+
+
+SummaryAgent, RiskAgent, and ClauseAgent run in parallel (fan-out) after
+DocumentAgent. LangGraph fans in at recommendation_agent, waiting for all
+three branches before proceeding. RecommendationAgent is sequential because
+it reads summary, risks, and clauses produced by the parallel trio.
 """
 
 from __future__ import annotations
@@ -28,21 +26,12 @@ from app.agents.risk_agent import RiskAgent
 from app.agents.summary_agent import SummaryAgent
 from app.state.contract_state import ContractState
 
-# ── Agent instances ────────────────────────────────────────────────────────────
-# Agents are instantiated once and reused across all graph invocations.
-# Replace with dependency-injected instances when services are wired up.
-
 _document_agent = DocumentAgent()
 _summary_agent = SummaryAgent()
 _risk_agent = RiskAgent()
 _clause_agent = ClauseAgent()
 _recommendation_agent = RecommendationAgent()
 _persistence_agent = PersistenceAgent()
-
-
-# ── Node wrapper functions ─────────────────────────────────────────────────────
-# LangGraph nodes must be plain callables: (state) -> partial_state.
-# These thin wrappers delegate to each agent's execute() method.
 
 
 def document_node(state: ContractState) -> ContractState:
@@ -75,31 +64,10 @@ def persistence_node(state: ContractState) -> ContractState:
     return _persistence_agent.execute(state)
 
 
-# ── Graph construction ─────────────────────────────────────────────────────────
-
-
 def build_contract_graph() -> StateGraph:
-    """Construct and compile the contract processing StateGraph.
-
-    Returns:
-        A compiled LangGraph ``StateGraph`` ready to be invoked with an
-        initial ``ContractState``.
-
-    Usage::
-
-        graph = build_contract_graph()
-        result = graph.invoke({
-            "session_id": "...",
-            "contract_id": "...",
-            "file_name": "contract.pdf",
-            "storage_path": "contracts/contract.pdf",
-            "processing_status": "pending",
-            "errors": [],
-        })
-    """
+    """Construct and compile the contract processing StateGraph."""
     builder = StateGraph(ContractState)
 
-    # ── Register nodes ─────────────────────────────────────────────────────────
     builder.add_node("document_agent", document_node)
     builder.add_node("summary_agent", summary_node)
     builder.add_node("risk_agent", risk_node)
@@ -107,18 +75,25 @@ def build_contract_graph() -> StateGraph:
     builder.add_node("recommendation_agent", recommendation_node)
     builder.add_node("persistence_agent", persistence_node)
 
-    # ── Define edges (execution order) ─────────────────────────────────────────
+    # Sequential start
     builder.add_edge(START, "document_agent")
+
+    # Fan-out: document_agent -> three parallel analysis agents
     builder.add_edge("document_agent", "summary_agent")
-    builder.add_edge("summary_agent", "risk_agent")
-    builder.add_edge("risk_agent", "clause_agent")
+    builder.add_edge("document_agent", "risk_agent")
+    builder.add_edge("document_agent", "clause_agent")
+
+    # Fan-in: all three -> recommendation_agent (waits for all branches)
+    builder.add_edge("summary_agent", "recommendation_agent")
+    builder.add_edge("risk_agent", "recommendation_agent")
     builder.add_edge("clause_agent", "recommendation_agent")
+
+    # Sequential finish
     builder.add_edge("recommendation_agent", "persistence_agent")
     builder.add_edge("persistence_agent", END)
 
     return builder.compile()
 
 
-# Module-level compiled graph instance.
-# Import and invoke this directly: ``from app.workflows.contract_workflow import contract_graph``
+# Module-level instance - import as: from app.workflows.contract_workflow import contract_graph
 contract_graph = build_contract_graph()
